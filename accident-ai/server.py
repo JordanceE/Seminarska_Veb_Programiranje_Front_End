@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify, send_from_directory
 from extract_scene import extract_scene
 import os
+import tempfile
 
 app = Flask(__name__, static_folder="../RoadWatch")
 
@@ -29,8 +30,14 @@ def analyze():
             "error": "No selected file"
         }), 400
 
-    path = "temp.png"
-    file.save(path)
+    suffix = os.path.splitext(file.filename)[1] or ".png"
+
+    with tempfile.NamedTemporaryFile(
+            suffix=suffix,
+            delete=False
+    ) as temporary_file:
+        path = temporary_file.name
+        file.save(path)
 
     try:
         scene = extract_scene(path)
@@ -39,6 +46,7 @@ def analyze():
         if os.path.exists(path):
             os.remove(path)
 
-
 if __name__ == "__main__":
-    app.run(port=5000)
+    app.run(host="0.0.0.0",
+        port=5000
+            )

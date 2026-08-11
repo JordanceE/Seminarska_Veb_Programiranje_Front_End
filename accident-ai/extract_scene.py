@@ -1,7 +1,7 @@
 from ultralytics import YOLO
 import cv2
 import numpy as np
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional, List
 
 model = YOLO("yolov8n.pt")
@@ -17,9 +17,18 @@ TYPE_MAP = {
 
 
 class SceneResult(BaseModel):
-    location: dict = {}
-    cars: List[dict] = []
-    measurements: List[dict] = []
+    location: dict = Field(
+        default_factory=dict
+    )
+
+    cars: List[dict] = Field(
+        default_factory=list
+    )
+
+    measurements: List[dict] = Field(
+        default_factory=list
+    )
+
     ai_summary: Optional[str] = None
     confidence: Optional[float] = None
 
