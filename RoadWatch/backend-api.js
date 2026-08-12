@@ -406,10 +406,11 @@ export function initBackend(
         canvasView
     }
 ) {
-    state.backendSceneId =
-        localStorage.getItem(
-            "currentAccidentSceneId"
-        )
+    const rememberedSceneId =
+    localStorage.getItem(
+        "currentAccidentSceneId"
+    )
+    state.backendSceneId = null
 
     function updateSceneIdDisplay() {
         const element =
@@ -532,7 +533,16 @@ export function initBackend(
 
         return saveCurrentScene()
     }
+    async function createNewScene() {
+    /*
+     * The frontend state must be cleared before this
+     * function is called. createScene() reads the
+     * current frontend location and road layout.
+     */
+    clearCurrentId()
 
+    return createScene()
+}
     async function getScene(id) {
         return request(
             `${API_BASE}/${encodeURIComponent(id)}`
@@ -582,7 +592,7 @@ export function initBackend(
         )
 
         const loadedMeasurements =
-            scene.measurements.map(
+             (scene.measurements || []).map(
                 measurement => ({
                     measurementId:
                         measurement.measurementId,
@@ -667,6 +677,20 @@ export function initBackend(
 
         return scene
     }
+    async function restoreLastScene() {
+    if (!rememberedSceneId) {
+        return null
+    }
+
+    try {
+        return await loadScene(
+            rememberedSceneId
+        )
+    } catch (error) {
+        clearCurrentId()
+        throw error
+    }
+}
 
     async function searchScenes({
         query = "",
@@ -707,7 +731,140 @@ export function initBackend(
 
         return request(url)
     }
+    async function ensureCurrentScene() {
+    if (state.backendSceneId) {
+        return state.backendSceneId
+    }
 
+    return createScene()
+}
+
+async function addVehicle(car) {
+    const sceneId =
+        await ensureCurrentScene()
+
+    await request(
+        `${API_BASE}/${
+            encodeURIComponent(sceneId)
+        }/vehicles`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type":
+                    "application/json"
+            },
+            body: JSON.stringify({
+                vehicle:
+                    toBackendVehicle(car)
+            })
+        }
+    )
+
+    return sceneId
+}
+
+async function removeVehicle(vehicleId) {
+    if (!state.backendSceneId) {
+        return
+    }
+
+    await request(
+        `${API_BASE}/${
+            encodeURIComponent(
+                state.backendSceneId
+            )
+        }/vehicles/${
+            encodeURIComponent(vehicleId)
+        }`,
+        {
+            method: "DELETE"
+        }
+    )
+}
+
+async function addMeasurement(measurement) {
+    const sceneId =
+        await ensureCurrentScene()
+
+    await request(
+        `${API_BASE}/${
+            encodeURIComponent(sceneId)
+        }/measurements`,
+        {
+            method: "POST",
+            headers: {
+                "Content-Type":
+                    "application/json"
+            },
+            body: JSON.stringify({
+                measurement:
+                    toBackendMeasurement(
+                        state,
+                        measurement
+                    )
+            })
+        }
+    )
+
+    return sceneId
+}
+
+async function removeMeasurement(
+    measurementId
+) {
+    if (!state.backendSceneId) {
+        return
+    }
+
+    await request(
+        `${API_BASE}/${
+            encodeURIComponent(
+                state.backendSceneId
+            )
+        }/measurements/${
+            encodeURIComponent(
+                measurementId
+            )
+        }`,
+        {
+            method: "DELETE"
+        }
+    )
+}
+
+async function finalizeScene(sceneId) {
+    if (!sceneId) {
+        throw new Error(
+            "An accident scene ID is required."
+        )
+    }
+
+    await request(
+        `${API_BASE}/${
+            encodeURIComponent(sceneId)
+        }/finalize`,
+        {
+            method: "POST"
+        }
+    )
+}
+
+async function archiveScene(sceneId) {
+    if (!sceneId) {
+        throw new Error(
+            "An accident scene ID is required."
+        )
+    }
+
+    await request(
+        `${API_BASE}/${
+            encodeURIComponent(sceneId)
+        }/archive`,
+        {
+            method: "POST"
+        }
+    )
+}
     async function analyzeImage(file) {
         const id =
             await saveCurrentScene()
@@ -737,21 +894,20 @@ export function initBackend(
     updateSceneIdDisplay()
 
     return {
-        saveCurrentScene,
+    saveCurrentScene,
     saveAsNewScene,
     loadScene,
+    restoreLastScene,
     getScene,
     searchScenes,
     analyzeImage,
-    deleteScene // createScene,
-        // saveCurrentScene,
-        // saveAsNewScene,
-        // loadScene,
-        // getScene,
-        // deleteScene,
-        // searchScenes,
-        // analyzeImage,
-        // clearCurrentId,
-        // updateSceneIdDisplay
-    }
+    deleteScene,
+    addVehicle,
+    removeVehicle,
+    addMeasurement,
+    removeMeasurement,
+    finalizeScene,
+    archiveScene,
+        createNewScene
+}
 }

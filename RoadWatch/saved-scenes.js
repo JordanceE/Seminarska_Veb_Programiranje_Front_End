@@ -29,8 +29,25 @@ export function initSavedScenes(backend) {
         detailsPage: document.getElementById("sceneDetailsPage"),
         detailsTitle: document.getElementById("sceneDetailsTitle"),
         detailsContent: document.getElementById("sceneDetailsContent"),
-        backToSavedButton: document.getElementById("backToSavedScenesBtn"),
-        deleteSceneButton: document.getElementById("deleteAccidentSceneBtn")
+        backToSavedButton:
+    document.getElementById(
+        "backToSavedScenesBtn"
+    ),
+
+finalizeSceneButton:
+    document.getElementById(
+        "finalizeAccidentSceneBtn"
+    ),
+
+archiveSceneButton:
+    document.getElementById(
+        "archiveAccidentSceneBtn"
+    ),
+
+deleteSceneButton:
+    document.getElementById(
+        "deleteAccidentSceneBtn"
+    )
     };
 
     for (const [name, element] of Object.entries(elements)) {
@@ -44,6 +61,7 @@ export function initSavedScenes(backend) {
     let currentPage = 0;
     let totalPages = 0;
     let viewedSceneId = null;
+    let viewedScene = null;
 
     function showEditor() {
     elements.editor.hidden = false;
@@ -142,6 +160,43 @@ async function showSavedScenes(page = 0) {
 
         updatePagination();
     }
+    function updateLifecycleButtons(scene) {
+    const status =
+        scene?.status
+
+    const vehicleCount =
+        scene?.vehicles?.length || 0
+
+    const canFinalize =
+        (
+            status === "DRAFT" ||
+            status === "AI_ANALYZED"
+        ) &&
+        vehicleCount > 0
+
+    const canArchive =
+        status === "FINALIZED"
+
+    elements.finalizeSceneButton.disabled =
+        !canFinalize
+
+    elements.archiveSceneButton.disabled =
+        !canArchive
+
+    elements.finalizeSceneButton.title =
+        canFinalize
+            ? "Finalize this accident scene"
+            : (
+                vehicleCount === 0
+                    ? "A scene needs at least one vehicle before it can be finalized"
+                    : `A ${status} scene cannot be finalized`
+            )
+
+    elements.archiveSceneButton.title =
+        canArchive
+            ? "Archive this finalized scene"
+            : "Only finalized scenes can be archived"
+}
     async function showSceneDetails(id) {
     viewedSceneId = id;
 
@@ -156,12 +211,18 @@ async function showSavedScenes(page = 0) {
         "<p>Loading complete accident-scene information...</p>";
 
     elements.deleteSceneButton.disabled = true;
+    elements.finalizeSceneButton.disabled =
+    true
 
+elements.archiveSceneButton.disabled =
+    true
     try {
         const scene =
             await backend.getScene(id);
 
         viewedSceneId = scene.id;
+        viewedScene = scene
+updateLifecycleButtons(scene)
 
         renderSceneDetails(scene);
 
@@ -745,6 +806,107 @@ function formatDate(value) {
     "click",
     () => showSavedScenes(currentPage)
 );
+    elements.finalizeSceneButton
+    .addEventListener(
+        "click",
+        async () => {
+            if (!viewedSceneId) {
+                return
+            }
+
+            const confirmed =
+                window.confirm(
+                    "Finalize this accident scene?\n\n" +
+                    "After finalization, the scene can no longer be edited."
+                )
+
+            if (!confirmed) {
+                return
+            }
+
+            const button =
+                elements.finalizeSceneButton
+
+            const originalText =
+                button.textContent
+
+            button.disabled = true
+            button.textContent =
+                "Finalizing..."
+
+            try {
+                await backend.finalizeScene(
+                    viewedSceneId
+                )
+
+                await showSceneDetails(
+                    viewedSceneId
+                )
+            } catch (error) {
+                alert(
+                    "Unable to finalize scene:\n" +
+                    error.message
+                )
+
+                updateLifecycleButtons(
+                    viewedScene
+                )
+            } finally {
+                button.textContent =
+                    originalText
+            }
+        }
+    )
+    elements.archiveSceneButton
+    .addEventListener(
+        "click",
+        async () => {
+            if (!viewedSceneId) {
+                return
+            }
+
+            const confirmed =
+                window.confirm(
+                    "Archive this accident scene?"
+                )
+
+            if (!confirmed) {
+                return
+            }
+
+            const button =
+                elements.archiveSceneButton
+
+            const originalText =
+                button.textContent
+
+            button.disabled = true
+            button.textContent =
+                "Archiving..."
+
+            try {
+                await backend.archiveScene(
+                    viewedSceneId
+                )
+
+                await showSceneDetails(
+                    viewedSceneId
+                )
+            } catch (error) {
+                alert(
+                    "Unable to archive scene:\n" +
+                    error.message
+                )
+
+                updateLifecycleButtons(
+                    viewedScene
+                )
+            } finally {
+                button.textContent =
+                    originalText
+            }
+        }
+    )
     elements.deleteSceneButton.addEventListener(
     "click",
     async () => {

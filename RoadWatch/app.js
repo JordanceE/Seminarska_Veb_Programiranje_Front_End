@@ -117,7 +117,9 @@ const backend =
             canvasView
         }
     )
-
+ui.setBackend(backend)
+canvasView.setBackend(backend)
+measurements.setBackend(backend)
 initStorage(
     state,
     {
@@ -140,3 +142,10 @@ initSavedScenes(
 )
 
 canvasView.start()
+backend.restoreLastScene()
+    .catch(error => {
+        console.error(
+            "Could not restore the last scene:",
+            error
+        )
+    })
